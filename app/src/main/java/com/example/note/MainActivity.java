@@ -1,105 +1,134 @@
 package com.example.note;
 
-
 import androidx.appcompat.app.AppCompatActivity;
+
+import android.database.Cursor;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TableLayout;
+import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.database.Cursor;
+
+import java.text.DecimalFormat;
 
 public class MainActivity extends AppCompatActivity {
-
-    NoteModel DBMD;
+    SQLiteData myDb;
     TextView balance;
-    EditText Date, Item, Price;
-    Button Add, Sub;
-    TextView history;
+    EditText edDate;
+    EditText editPrice;
+    EditText editItem;
+    Button btnAdd;
+    Button btnSub;
+    TableLayout history;
+    DecimalFormat df = new DecimalFormat("0.00");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.activity_main);
-        DBMD = new NoteModel(this);
+        myDb = new SQLiteData(this);
+
         balance = (TextView) findViewById(R.id.balance);
-        Date = (EditText) findViewById(R.id.Date);
-        Price = (EditText) findViewById(R.id.Price);
-        Item = (EditText) findViewById(R.id.Item);
-        Add = (Button) findViewById(R.id.Add);
-        Sub = (Button) findViewById(R.id.Sub);
-        history = (TextView) findViewById(R.id.history);
-        addHistory();
-        retHistory();
+        edDate = (EditText) findViewById(R.id.editDate);
+        editPrice = (EditText) findViewById(R.id.editPrice);
+        editItem = (EditText) findViewById(R.id.editItem);
+        btnAdd = (Button) findViewById(R.id.btnAdd);
+        btnSub = (Button) findViewById(R.id.btnSub);
+        history = (TableLayout) findViewById(R.id.tableHistory);
+        AddTransaction();
+        GetHistory();
     }
 
-    public void addHistory(){
-        Add.setOnClickListener(
+    public void AddTransaction(){
+        btnAdd.setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        double price = Double.parseDouble(Price.getText().toString());
-                        boolean result = DBMD.createHistory(Item.getText().toString(), Date.getText().toString(), price);
-                        if (result)
-                            Toast.makeText(MainActivity.this, "Successfully Created", Toast.LENGTH_LONG).show();
-                        else
-                            Toast.makeText(MainActivity.this, "Failed to Create", Toast.LENGTH_LONG).show();
-                        retHistory();
-                        MainActivity.this.Date.setText("");
-                        MainActivity.this.Price.setText("");
+                        double price = Double.parseDouble(editPrice.getText().toString());
+                        TM model = new TM();
 
-                        MainActivity.this.Item.setText("");
+                        model.mDate =  edDate.getText().toString();
+                        model.mItem = editItem.getText().toString();
+                        model.mPrice = price;
+                        boolean result = myDb.createTransaction(model);
+                        if (result)
+                            Toast.makeText(MainActivity.this, "Transaction Created", Toast.LENGTH_LONG).show();
+                        else
+                            Toast.makeText(MainActivity.this, "Transaction Not Created", Toast.LENGTH_LONG).show();
+                        GetHistory();
+                        ClearText();
                     }
                 }
         );
 
-        Sub.setOnClickListener(
+        btnSub.setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        double price = -1 * Double.parseDouble(Price.getText().toString());
-                        boolean result = DBMD.createHistory(Item.getText().toString(), Date.getText().toString(), price);
+                        double price = -1 * Double.parseDouble(editPrice.getText().toString());
+                        TM model = new TM();
+                        model.mDate =  edDate.getText().toString();
+                        model.mItem = editItem.getText().toString();
+                        model.mPrice = price;
+                        boolean result = myDb.createTransaction(model);
                         if (result)
-                            Toast.makeText(MainActivity.this, "Successfully Created", Toast.LENGTH_LONG).show();
+                            Toast.makeText(MainActivity.this, "Transaction Created", Toast.LENGTH_LONG).show();
                         else
-                            Toast.makeText(MainActivity.this, "Failed to Create", Toast.LENGTH_LONG).show();
-                        retHistory();
-                        MainActivity.this.Date.setText("");
-                        MainActivity.this.Price.setText("");
-
-                        MainActivity.this.Item.setText("");
+                            Toast.makeText(MainActivity.this, "Transaction Not Created", Toast.LENGTH_LONG).show();
+                        GetHistory();
+                        ClearText();
                     }
                 }
         );
     }
 
-    public void retHistory(){
-        Cursor result = DBMD.pullData();
-        StringBuffer str = new StringBuffer();
+    public void GetHistory(){
+        ClearTable();
+        Cursor result = myDb.getAllData();
+        StringBuffer buffer = new StringBuffer();
         Double balance = 0.0;
-
         while(result.moveToNext()){
-            String priceString = result.getString(3);
+            TableRow tr = new TableRow(this);
+            TableRow.LayoutParams columnLayout = new TableRow.LayoutParams(TableRow.LayoutParams.WRAP_CONTENT, TableRow.LayoutParams.WRAP_CONTENT);
+            columnLayout.weight = 1;
+
+            TextView date = new TextView(this);
+            date.setLayoutParams(columnLayout);
+            date.setText(result.getString(2));
+            tr.addView(date);
+
+            TextView priceView = new TextView(this);
+            priceView.setLayoutParams(columnLayout);
+            priceView.setText(result.getString(3));
+            tr.addView(priceView);
+
+            TextView item = new TextView(this);
+            item.setLayoutParams(columnLayout);
+            item.setText(result.getString(1));
+            tr.addView(item);
+
+            history.addView(tr, new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, TableLayout.LayoutParams.WRAP_CONTENT));
+
+            // get price for balance
             double price = Double.parseDouble(result.getString(3));
             balance += price;
-
-            if (price < 0) {
-                str.append("Spent $");
-                priceString = priceString.substring(1);
-
-
-
-
-            }
-            else {
-                str.append("Added $");
-            }
-            str.append(priceString + " on " + result.getString(2)
-                    + " for " + result.getString(1) + "\n");
         }
-        MainActivity.this.balance.setText("Current Balance: $" + Double.toString(balance));
-        MainActivity.this.history.setText(str);
+        MainActivity.this.balance.setText("Current Balance: $" + df.format(balance));
+    }
+
+    public void ClearText(){
+        MainActivity.this.edDate.setText("");
+        MainActivity.this.editPrice.setText("");
+        MainActivity.this.editItem.setText("");
+    }
+
+    public void ClearTable(){
+        int count = history.getChildCount();
+        for (int i = 1; i < count; i++) {
+            history.removeViewAt(1);
+        }
     }
 }
